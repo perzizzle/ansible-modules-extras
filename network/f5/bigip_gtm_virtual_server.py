@@ -24,7 +24,7 @@ module: bigip_gtm_virtual_server
 short_description: "Manages F5 BIG-IP GTM virtual servers"
 description:
     - "Manages F5 BIG-IP GTM virtual servers"
-version_added: "1.9"
+version_added: "2.0"
 author: 'Michael Perzel'
 notes:
     - "Requires BIG-IP software version >= 11.4"
@@ -39,41 +39,36 @@ options:
         description:
             - BIG-IP host
         required: true
-        default: null
-        choices: []
-        aliases: []
     user:
         description:
             - BIG-IP username
         required: true
-        default: null
-        choices: []
-        aliases: []
     password:
         description:
             - BIG-IP password
         required: true
-        default: null
-        choices: []
-        aliases: []
     state:
         description:
             - Virtual server state
         required: true
         choices: ['present', 'absent','enabled','disabled']
-        aliases: []
     virtual_server_name:
         description:
             - Virtual server name
         required: True
-        default: null
-        aliases: []
     virtual_server_server:
         description:
             - Virtual server server
         required: true
-        default: null
-        aliases: []
+    host:
+        description:
+            - Virtual server host
+        required: false
+        aliases: ['address']
+    port:
+        description:
+            - Virtual server port
+        required: false
 '''
 
 EXAMPLES = '''
@@ -100,7 +95,7 @@ def bigip_api(bigip, user, password):
     return api
 
 def virtual_server_exists(api, name, server):
-    # hack to determine if pool exists
+    # hack to determine if virtual server exists
     result = False
     try:
         virtual_server_id = {'name': name, 'server': server}
@@ -113,6 +108,15 @@ def virtual_server_exists(api, name, server):
             # genuine exception
             raise
     return result
+
+def add_virtual_server(api, virtual_server_name, virtual_server_server, address, port):
+    addresses = {'address': address, 'port': port}
+    virtual_server_id = {'name': virtual_server_name, 'server': virtual_server_server}
+    api.GlobalLB.VirtualServerV2.create([virtual_server_id], [addresses])
+
+def remove_virtual_server(api, virtual_server_name, virtual_server_server):
+    virtual_server_id = {'name': virtual_server_name, 'server': virtual_server_server}
+    api.GlobalLB.VirtualServerV2.delete_virtual_server([virtual_server_id])
 
 def get_virtual_server_state(api, name, server):
     virtual_server_id = {'name': name, 'server': server}
@@ -132,6 +136,8 @@ def main():
             user = dict(type='str', required=True),
             password = dict(type='str', required=True),
             state = dict(type='str', required=True, choices=['present', 'absent', 'enabled', 'disabled']),
+            host =  dict(type='str', aliases=['address']),
+            port = dict(type='int'),
             virtual_server_name = dict(type='str', required=True),
             virtual_server_server = dict(type='str', required=True)
         ),
@@ -147,6 +153,8 @@ def main():
     virtual_server_name = module.params['virtual_server_name']
     virtual_server_server = module.params['virtual_server_server']
     state = module.params['state']
+    address = module.params['host']
+    port = module.params['port']
 
     result = {'changed': False}  # default
 
@@ -157,22 +165,30 @@ def main():
             module.fail_json(msg="virtual server does not exist")
 
         if state == 'absent':
-            if not module.check_mode:
-                # Stub
-                remove_virtual_server(api, pool, virtual_server_name, virtual_server_server)
-                result = {'changed': True, 'deleted': deleted}
-            else:
-                result = {'changed': True}
+            if virtual_server_name and virtual_server_server:
+                if virtual_server_exists(api, virtual_server_name, virtual_server_server):
+                    if not module.check_mode:
+                        remove_virtual_server(api, virtual_server_name, virtual_server_server)
+                        result = {'changed': True}
+                    else:
+                        # check-mode return value
+                        result = {'changed': True}
         elif state == 'present':
-            if not module.check_mode:
-                # Stub
-                add_virtual_server(api, pool, virtual_server_name, virtual_server_server)
-                result = {'changed': True}
-            else:
-                # Stub
-                # virtual server exists -- potentially modify attributes
-                result = {'changed': True}
+            if virtual_server_name and virtual_server_server and address and port:
+                if not virtual_server_exists(api, virtual_server_name, virtual_server_server):
+                    if not module.check_mode:
+                        add_virtual_server(api, virtual_server_name, virtual_server_server, address, port)
+                        result = {'changed': True}
+                    else:
+                        # check-mode return value
+                        result = {'changed': True}
+                else:
+                    # Stub
+                    # virtual server exists -- potentially modify attributes
+                    result = {'changed': True}
         elif state == 'enabled':
+            if not virtual_server_exists(api, virtual_server_name, virtual_server_server):
+                module.fail_json(msg="virtual server does not exist")
             if state != get_virtual_server_state(api, virtual_server_name, virtual_server_server):
                 if not module.check_mode:
                     set_virtual_server_state(api, virtual_server_name, virtual_server_server, state)
@@ -180,6 +196,8 @@ def main():
                 else:
                     result = {'changed': True}
         elif state == 'disabled':
+            if not virtual_server_exists(api, virtual_server_name, virtual_server_server):
+                module.fail_json(msg="virtual server does not exist")
             if state != get_virtual_server_state(api, virtual_server_name, virtual_server_server):
                 if not module.check_mode:
                     set_virtual_server_state(api, virtual_server_name, virtual_server_server, state)
