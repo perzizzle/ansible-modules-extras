@@ -90,8 +90,8 @@ except ImportError:
 else:
     bigsuds_found = True
 
-def bigip_api(bigip, user, password):
-    api = bigsuds.BIGIP(hostname=bigip, username=user, password=password)
+def bigip_api(server, user, password):
+    api = bigsuds.BIGIP(hostname=server, username=user, password=password)
     return api
 
 def virtual_server_exists(api, name, server):
@@ -161,18 +161,14 @@ def main():
     try:
         api = bigip_api(server, user, password)
 
-        if not virtual_server_exists(api, virtual_server_name, virtual_server_server):
-            module.fail_json(msg="virtual server does not exist")
-
         if state == 'absent':
-            if virtual_server_name and virtual_server_server:
-                if virtual_server_exists(api, virtual_server_name, virtual_server_server):
-                    if not module.check_mode:
-                        remove_virtual_server(api, virtual_server_name, virtual_server_server)
-                        result = {'changed': True}
-                    else:
-                        # check-mode return value
-                        result = {'changed': True}
+            if virtual_server_exists(api, virtual_server_name, virtual_server_server):
+                if not module.check_mode:
+                    remove_virtual_server(api, virtual_server_name, virtual_server_server)
+                    result = {'changed': True}
+                else:
+                    # check-mode return value
+                    result = {'changed': True}
         elif state == 'present':
             if virtual_server_name and virtual_server_server and address and port:
                 if not virtual_server_exists(api, virtual_server_name, virtual_server_server):
@@ -183,9 +179,10 @@ def main():
                         # check-mode return value
                         result = {'changed': True}
                 else:
-                    # Stub
-                    # virtual server exists -- potentially modify attributes
-                    result = {'changed': True}
+                    # virtual server exists -- potentially modify attributes --future feature
+                    result = {'changed': False}
+            else:
+                module.fail_json(msg="Address and port are required to create virtual server")
         elif state == 'enabled':
             if not virtual_server_exists(api, virtual_server_name, virtual_server_server):
                 module.fail_json(msg="virtual server does not exist")
