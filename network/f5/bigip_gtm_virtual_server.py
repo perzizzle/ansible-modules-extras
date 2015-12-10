@@ -93,6 +93,20 @@ else:
 def bigip_api(server, user, password):
     api = bigsuds.BIGIP(hostname=server, username=user, password=password)
     return api
+    
+def server_exists(api, server):
+    # hack to determine if virtual server exists
+    result = False
+    try:
+        api.GlobalLB.Server.get_object_status([server])
+        result = True
+    except bigsuds.OperationFailed, e:
+        if "was not found" in str(e):
+            result = False
+        else:
+            # genuine exception
+            raise
+    return result
 
 def virtual_server_exists(api, name, server):
     # hack to determine if virtual server exists
@@ -173,8 +187,11 @@ def main():
             if virtual_server_name and virtual_server_server and address and port:
                 if not virtual_server_exists(api, virtual_server_name, virtual_server_server):
                     if not module.check_mode:
-                        add_virtual_server(api, virtual_server_name, virtual_server_server, address, port)
-                        result = {'changed': True}
+                        if server_exists(api, virtual_server_server):
+                            add_virtual_server(api, virtual_server_name, virtual_server_server, address, port)
+                            result = {'changed': True}
+                        else: 
+                            module.fail_json(msg="server does not exist")
                     else:
                         # check-mode return value
                         result = {'changed': True}
