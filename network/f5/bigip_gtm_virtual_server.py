@@ -24,7 +24,7 @@ module: bigip_gtm_virtual_server
 short_description: "Manages F5 BIG-IP GTM virtual servers"
 description:
     - "Manages F5 BIG-IP GTM virtual servers"
-version_added: "2.0"
+version_added: "2.2"
 author: 'Michael Perzel'
 notes:
     - "Requires BIG-IP software version >= 11.4"
@@ -50,7 +50,8 @@ options:
     state:
         description:
             - Virtual server state
-        required: true
+        required: false
+        default: present
         choices: ['present', 'absent','enabled','disabled']
     virtual_server_name:
         description:
@@ -64,11 +65,13 @@ options:
         description:
             - Virtual server host
         required: false
+        default: None
         aliases: ['address']
     port:
         description:
             - Virtual server port
         required: false
+        default: None
 '''
 
 EXAMPLES = '''
@@ -148,10 +151,10 @@ def main():
         argument_spec = dict(
             server = dict(type='str', required=True),
             user = dict(type='str', required=True),
-            password = dict(type='str', required=True),
-            state = dict(type='str', required=True, choices=['present', 'absent', 'enabled', 'disabled']),
-            host =  dict(type='str', aliases=['address']),
-            port = dict(type='int'),
+            password = dict(type='str', required=True, no_log=True),
+            state = dict(type='str', default='present', choices=['present', 'absent', 'enabled', 'disabled']),
+            host =  dict(type='str', default=None, aliases=['address']),
+            port = dict(type='int', default=None),
             virtual_server_name = dict(type='str', required=True),
             virtual_server_server = dict(type='str', required=True)
         ),
