@@ -74,6 +74,13 @@ options:
         default: None
 '''
 
+RETURN = '''
+bigip_gtm_virtual_server:
+    description: Provides the ability to create, delete, enable, disable GTM virtual servers
+    returned: success
+    type: dictionary
+'''
+
 EXAMPLES = '''
   - name: Enable virtual server
     local_action: >
